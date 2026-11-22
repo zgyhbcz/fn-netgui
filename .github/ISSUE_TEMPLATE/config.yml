@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题
+    url: https://github.com/
+    about: 请勿公开披露可利用细节，使用 SECURITY.md 中的私下报告渠道
+  - name: 使用问题 / 讨论
+    url: https://github.com/
+    about: 配置思路、命令解释类问题请走 Discussions

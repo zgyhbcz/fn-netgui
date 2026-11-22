@@ -1,0 +1,163 @@
+#!/bin/bash
+# fn-netgui lifecycle: start | stop | status | restart
+# Runs as root (config/privilege run-as=root) because nmcli/ovs-vsctl need privileges.
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+APP_DIR="${TRIM_APPDEST:-/var/apps/${APP_NAME}}"
+DATA_DIR="${TRIM_PKGVAR:-${APP_DIR}/var}"
+PORT="${TRIM_SERVICE_PORT:-38471}"
+LOG="${DATA_DIR}/netgui.log"
+PID_FILE="${DATA_DIR}/netgui.pid"
+SERVER_JS="${APP_DIR}/server/server.js"
+NODE_BIN=""
+
+mkdir -p "${DATA_DIR}" 2>/dev/null || true
+
+log_msg() {
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"${LOG}" 2>/dev/null || true
+}
+
+find_node() {
+    local cand
+    for cand in \
+        /var/apps/nodejs_v22/target/bin/node \
+        /var/apps/nodejs_v24/target/bin/node \
+        /var/apps/nodejs_v20/target/bin/node \
+        /vol*/@appcenter/nodejs_v2*/bin/node \
+        /usr/local/bin/node \
+        /usr/bin/node; do
+        if [ -x "${cand}" ]; then
+            NODE_BIN="${cand}"
+            return 0
+        fi
+    done
+    if command -v node >/dev/null 2>&1; then
+        NODE_BIN="$(command -v node)"
+        return 0
+    fi
+    return 1
+}
+
+check_process() {
+    local pid="$1"
+    [ -n "${pid}" ] || return 1
+    kill -0 "${pid}" 2>/dev/null
+}
+
+read_pid() {
+    if [ -r "${PID_FILE}" ]; then
+        head -n 1 "${PID_FILE}" 2>/dev/null | tr -d '[:space:]'
+    fi
+}
+
+is_running() {
+    local pid
+    pid="$(read_pid)"
+    if check_process "${pid}"; then
+        return 0
+    fi
+    return 1
+}
+
+start_app() {
+    if is_running; then
+        echo "already running (pid $(read_pid))"
+        return 0
+    fi
+    rm -f "${PID_FILE}"
+
+    if [ ! -f "${SERVER_JS}" ]; then
+        printf '服务文件缺失: %s\n' "${SERVER_JS}" >"${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+        log_msg "start failed: ${SERVER_JS} not found"
+        exit 1
+    fi
+
+    if ! find_node; then
+        printf '未找到 Node.js 运行时，请在应用中心安装 nodejs_v22 后重试。\n' >"${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+        log_msg "start failed: node runtime not found"
+        exit 1
+    fi
+
+    # 端口被上一次异常退出的残留进程占用时先清理，避免 EADDRINUSE
+    if command -v fuser >/dev/null 2>&1; then
+        fuser -k -9 "${PORT}/tcp" >/dev/null 2>&1 || true
+    fi
+
+    log_msg "starting ${APP_NAME} ${TRIM_APPVER:-} on port ${PORT} with ${NODE_BIN}"
+    cd "${APP_DIR}/server" || exit 1
+    TRIM_APPDEST="${APP_DIR}" \
+    TRIM_PKGVAR="${DATA_DIR}" \
+    TRIM_SERVICE_PORT="${PORT}" \
+    TRIM_APPVER="${TRIM_APPVER:-}" \
+    TRIM_APPNAME="${APP_NAME}" \
+        nohup "${NODE_BIN}" "${SERVER_JS}" >>"${LOG}" 2>&1 &
+    echo $! >"${PID_FILE}"
+
+    local i
+    if command -v curl >/dev/null 2>&1; then
+        for i in $(seq 1 20); do
+            if curl -sf "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+                echo "started (pid $(read_pid), port ${PORT})"
+                return 0
+            fi
+            if ! is_running; then
+                printf '服务启动后立即退出，请查看日志：%s\n' "${LOG}" >"${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+                log_msg "start failed: process exited, see ${LOG}"
+                exit 1
+            fi
+            sleep 1
+        done
+        echo "started (pid $(read_pid)), health check timed out — see ${LOG}"
+        return 0
+    fi
+
+    sleep 2
+    if is_running; then
+        echo "started (pid $(read_pid), port ${PORT})"
+        return 0
+    fi
+    printf '服务启动失败，请查看日志：%s\n' "${LOG}" >"${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+    log_msg "start failed: process exited (no curl for health check), see ${LOG}"
+    exit 1
+}
+
+stop_app() {
+    local pid
+    pid="$(read_pid)"
+    if check_process "${pid}"; then
+        log_msg "stopping pid ${pid}"
+        kill -TERM "${pid}" 2>/dev/null || true
+        local i
+        for i in $(seq 1 10); do
+            check_process "${pid}" || break
+            sleep 1
+        done
+        if check_process "${pid}"; then
+            kill -KILL "${pid}" 2>/dev/null || true
+        fi
+    fi
+    rm -f "${PID_FILE}"
+    echo "stopped"
+    return 0
+}
+
+status_app() {
+    if is_running; then
+        echo "running (pid $(read_pid))"
+        exit 0
+    fi
+    echo "not running"
+    exit 3
+}
+
+case "${1:-}" in
+    start) start_app ;;
+    stop) stop_app ;;
+    status) status_app ;;
+    restart) stop_app; sleep 1; start_app ;;
+    *)
+        echo "Usage: $0 {start|stop|status|restart}"
+        exit 1
+        ;;
+esac

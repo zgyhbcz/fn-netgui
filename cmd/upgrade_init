@@ -1,0 +1,13 @@
+#!/bin/bash
+# 升级前：备份状态文件。
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/${APP_NAME}/var}"
+STATE="${DATA_DIR}/state.json"
+
+mkdir -p "${DATA_DIR}" 2>/dev/null || true
+if [ -f "${STATE}" ]; then
+    cp -f "${STATE}" "${STATE}.bak" 2>/dev/null || true
+fi
+exit 0

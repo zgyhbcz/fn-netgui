@@ -1,0 +1,9 @@
+#!/bin/bash
+# 卸载后：仅记录日志。var/ 目录由系统保留，便于重装后恢复。
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/${APP_NAME}/var}"
+printf '%s uninstall_callback: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${APP_NAME}" \
+    >>"${DATA_DIR}/netgui.log" 2>/dev/null || true
+exit 0

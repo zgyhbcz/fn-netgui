@@ -1,0 +1,24 @@
+[
+  {
+    "stepTitle": "卸载网络配置管家",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "卸载不会自动改动你已有的网络配置。若希望把本应用创建过的连接（以及桥接端口）一并清理，请选择“删除”。"
+      },
+      {
+        "type": "radio",
+        "field": "wizard_remove_conns",
+        "label": "本应用创建的连接",
+        "initValue": "keep",
+        "options": [
+          { "label": "保留（推荐，网络保持现状）", "value": "keep" },
+          { "label": "删除（回滚到本应用创建之前）", "value": "delete" }
+        ],
+        "rules": [
+          { "required": true, "message": "请选择处理方式" }
+        ]
+      }
+    ]
+  }
+]

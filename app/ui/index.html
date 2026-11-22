@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>网络配置管家</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="images/icon-64.png">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="images/icon-64.png" alt="" width="40" height="40">
+      <div class="brand-text">
+        <h1>网络配置管家</h1>
+        <p id="hostLine" class="muted">正在读取系统信息…</p>
+      </div>
+    </div>
+    <div class="badges">
+      <span id="rootBadge" class="badge">权限检测中</span>
+      <span id="nmBadge" class="badge">nmcli 检测中</span>
+      <button id="btnRefresh" class="ghost" type="button">刷新状态</button>
+    </div>
+  </header>
+
+  <div id="alert" class="alert hidden" role="status"></div>
+
+  <main>
+    <section class="block">
+      <div class="block-head">
+        <h2>网卡</h2>
+        <span class="muted small">点击网卡可填入当前表单</span>
+      </div>
+      <div id="devices" class="devices"><p class="muted">加载中…</p></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>配置</h2>
+        <span id="conHint" class="muted small"></span>
+      </div>
+
+      <nav class="tabs" id="tabs">
+        <button type="button" data-tab="shared" class="active">NAT 共享</button>
+        <button type="button" data-tab="bridge">OVS 桥接</button>
+        <button type="button" data-tab="hotspot">WiFi 热点</button>
+        <button type="button" data-tab="edit">连接编辑</button>
+      </nav>
+
+      <form id="form" autocomplete="off" novalidate>
+        <!-- NAT 共享 -->
+        <div class="panel" data-panel="shared">
+          <p class="hint">让第二个网口变成独立的 NAT 子网：NetworkManager 自动提供 DHCP、DNS 与转发，下级设备插上就能上网，且上级网络只看到主机自己的 MAC。</p>
+          <div class="grid">
+            <label>网口
+              <select id="shIface"></select>
+            </label>
+            <label>共享网段（CIDR）
+              <input id="shAddr" value="10.0.6.1/24" data-format="ip" placeholder="10.0.6.1/24" spellcheck="false">
+            </label>
+            <label>DNS（可选，逗号分隔）
+              <input id="shDns" data-format="dns" placeholder="223.5.5.5, 119.29.29.29" spellcheck="false">
+            </label>
+            <label>MAC 地址（可选）
+              <input id="shMac" data-format="mac" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" spellcheck="false">
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="shClearMac"> 不使用克隆 MAC，恢复硬件默认地址</label>
+        </div>
+
+        <!-- OVS 桥接 -->
+        <div class="panel hidden" data-panel="bridge">
+          <p class="hint">把第二个网口作为 OVS 网桥的端口，让 NAS 变成二层交换机。需要先为接入外网的网口启用 OVS。</p>
+          <div class="grid">
+            <label>网口
+              <select id="bgIface"></select>
+            </label>
+            <label>桥接到网桥
+              <select id="bgBridge"></select>
+            </label>
+          </div>
+          <p id="bgTip" class="hint warn"></p>
+        </div>
+
+        <!-- WiFi 热点 -->
+        <div class="panel hidden" data-panel="hotspot">
+          <p class="hint">把无线网卡变成 AP：手机、平板直接连接，经主网口 NAT 上网。</p>
+          <div class="grid">
+            <label>无线网卡
+              <select id="hsIface"></select>
+            </label>
+            <label>WiFi 名称（SSID）
+              <input id="hsSsid" placeholder="fnOS-Hotspot" maxlength="32" spellcheck="false">
+            </label>
+            <label>WiFi 密码
+              <input id="hsPass" type="password" placeholder="至少 8 位" maxlength="63" spellcheck="false">
+            </label>
+            <label>频段
+              <select id="hsBand">
+                <option value="bg">2.4GHz（兼容性最好）</option>
+                <option value="a">5GHz（需网卡支持）</option>
+              </select>
+            </label>
+            <label>热点网段（CIDR）
+              <input id="hsSubnet" value="10.42.0.1/24" data-format="ip" spellcheck="false">
+            </label>
+          </div>
+        </div>
+
+        <!-- 连接编辑 -->
+        <div class="panel hidden" data-panel="edit">
+          <p class="hint">只允许编辑本应用创建的连接（<code>netgui-…</code>），避免误改系统网络。</p>
+          <div class="grid">
+            <label>连接
+              <select id="edCon"></select>
+            </label>
+            <label>地址获取方式
+              <select id="edMethod">
+                <option value="manual">静态地址</option>
+                <option value="auto">自动获取（DHCP）</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid" id="edManualFields">
+            <label>地址（CIDR）
+              <input id="edAddr" data-format="ip" placeholder="192.168.50.1/24" spellcheck="false">
+            </label>
+            <label>网关
+              <input id="edGw" data-format="ip" placeholder="192.168.50.1" spellcheck="false">
+            </label>
+            <label>DNS（逗号分隔）
+              <input id="edDns" data-format="dns" placeholder="223.5.5.5" spellcheck="false">
+            </label>
+            <label>MAC 地址（可选）
+              <input id="edMac" data-format="mac" maxlength="17" placeholder="AA:BB:CC:DD:EE:FF" spellcheck="false">
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="edClearMac"> 恢复硬件默认 MAC</label>
+        </div>
+      </form>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>命令预览</h2>
+        <span class="muted small">先预览，再执行</span>
+      </div>
+      <pre id="preview" class="code">点击「预览命令」查看将要执行的确切命令。</pre>
+      <div id="notes" class="notes"></div>
+      <div id="warnings" class="warns"></div>
+      <div class="actions">
+        <button id="btnPlan" class="ghost" type="button">预览命令</button>
+        <button id="btnApply" class="primary" type="button" disabled>执行</button>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h2>执行结果</h2></div>
+      <div id="results" class="results"><p class="muted">尚未执行。</p></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>本应用创建的配置</h2>
+        <span class="muted small">回滚只影响这里的条目</span>
+      </div>
+      <div id="managed"><p class="muted">暂无。</p></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>运行日志</h2>
+        <button id="btnLog" class="ghost small" type="button">刷新日志</button>
+      </div>
+      <pre id="log" class="code small">…</pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

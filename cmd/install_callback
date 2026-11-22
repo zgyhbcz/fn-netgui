@@ -1,0 +1,18 @@
+#!/bin/bash
+# 安装后：初始化状态文件（记录本应用创建的连接，用于回滚）。
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/${APP_NAME}/var}"
+STATE="${DATA_DIR}/state.json"
+LOG="${DATA_DIR}/netgui.log"
+
+mkdir -p "${DATA_DIR}" 2>/dev/null || true
+
+if [ ! -f "${STATE}" ]; then
+    printf '{"version":1,"entries":[]}\n' >"${STATE}"
+    chmod 600 "${STATE}" 2>/dev/null || true
+fi
+
+printf '%s install_callback: state=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${STATE}" >>"${LOG}" 2>/dev/null || true
+exit 0

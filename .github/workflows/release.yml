@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布到哪个 tag（如 v1.0.0）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布 .fpk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 从 tag 推导版本号
+        id: ver
+        run: |
+          REF="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${REF#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "发布版本：${VERSION}"
+
+      - name: 构建 .fpk
+        run: python tools/build_fpk.py --version "${{ steps.ver.outputs.version }}"
+
+      - name: 校验产物
+        run: python tools/verify_fpk.py dist/*.fpk
+
+      - name: 生成校验文件
+        run: |
+          cd dist
+          sha256sum *.fpk > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: fn-netgui ${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/*.fpk
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true

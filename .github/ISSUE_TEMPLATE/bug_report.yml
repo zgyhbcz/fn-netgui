@@ -1,0 +1,101 @@
+name: Bug 报告
+description: 配置不生效、执行报错、界面异常
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量填写完整——网络问题没有日志基本无法定位。
+        **提交前请删掉 MAC、SSID、公网 IP 等敏感信息。**
+
+  - type: input
+    id: fnos-version
+    attributes:
+      label: fnOS 版本
+      description: 可在 系统设置 → 关于，或 SSH 执行 `cat /etc/trim-release`
+      placeholder: '例如 1.2.1000'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: 架构
+      options:
+        - x86_64
+        - ARM64
+        - 其他（请在描述里说明）
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: fn-netgui 版本
+      description: 应用内右上角或 `manifest` 中的 version
+      placeholder: '1.0.0'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: 出问题的模式
+      options:
+        - NAT 共享
+        - OVS 桥接
+        - WiFi 热点
+        - 连接编辑
+        - 回滚
+        - 安装 / 启动 / 界面
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 选择网口 enp2s0
+        2. NAT 共享，网段 10.0.6.1/24，MAC AA:BB:...
+        3. 点执行
+        4. 报错 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: preview
+    attributes:
+      label: 命令预览内容
+      description: 界面「命令预览」区域的文本（已脱敏）
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: output
+    attributes:
+      label: 执行结果 / 报错
+      description: 界面「执行结果」中的 stdout / stderr
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: log
+    attributes:
+      label: 日志
+      description: '`tail -n 50 /var/apps/fn-netgui/var/netgui.log`（已脱敏）'
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 我已删除日志中的 MAC / SSID / 公网 IP 等敏感信息
+          required: true
+        - label: 我已搜索过现有 Issue，没有重复
+          required: true

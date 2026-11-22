@@ -1,0 +1,53 @@
+#!/bin/bash
+# 卸载前：先停服务；若用户在卸载向导里选择“删除”，则回收本应用创建的连接/网桥端口。
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+APP_DIR="${TRIM_APPDEST:-/var/apps/${APP_NAME}}"
+DATA_DIR="${TRIM_PKGVAR:-${APP_DIR}/var}"
+STATE="${DATA_DIR}/state.json"
+LOG="${DATA_DIR}/netgui.log"
+
+# 1. 停服务（忽略失败，不阻塞卸载）
+if [ -x "${APP_DIR}/cmd/main" ]; then
+    bash "${APP_DIR}/cmd/main" stop >>"${LOG}" 2>&1 || true
+fi
+
+# 2. 可选：删除本应用创建的连接
+if [ "${wizard_remove_conns:-keep}" = "delete" ] && [ -r "${STATE}" ]; then
+    NODE_BIN=""
+    for cand in /var/apps/nodejs_v22/target/bin/node /var/apps/nodejs_v24/target/bin/node \
+                /var/apps/nodejs_v20/target/bin/node /usr/local/bin/node /usr/bin/node; do
+        [ -x "${cand}" ] && NODE_BIN="${cand}" && break
+    done
+    if [ -z "${NODE_BIN}" ] && command -v node >/dev/null 2>&1; then
+        NODE_BIN="$(command -v node)"
+    fi
+    if [ -n "${NODE_BIN}" ]; then
+        "${NODE_BIN}" -e '
+const fs = require("fs");
+const { execFileSync } = require("child_process");
+const file = process.argv[1];
+let state = { entries: [] };
+try { state = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { process.exit(0); }
+for (const entry of (state.entries || [])) {
+  const label = entry.conName || entry.iface || "?";
+  try {
+    if (entry.mode === "bridge" && entry.bridge && entry.iface) {
+      execFileSync("ovs-vsctl", ["--if-exists", "del-port", entry.bridge, entry.iface], { stdio: "ignore" });
+      console.log("bridge port removed: " + entry.bridge + " " + entry.iface);
+    } else if (entry.conName) {
+      try { execFileSync("nmcli", ["connection", "down", entry.conName], { stdio: "ignore" }); } catch (e) {}
+      execFileSync("nmcli", ["connection", "delete", entry.conName], { stdio: "ignore" });
+      console.log("connection deleted: " + entry.conName);
+    }
+  } catch (err) {
+    console.error("cleanup failed: " + label + " -> " + err.message);
+  }
+}
+' "${STATE}" >>"${LOG}" 2>&1 || true
+    fi
+fi
+
+printf '%s uninstall_init: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${APP_NAME}" >>"${LOG}" 2>/dev/null || true
+exit 0

@@ -1,0 +1,23 @@
+#!/bin/bash
+# 安装前：准备数据目录，检查系统依赖。
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/${APP_NAME}/var}"
+LOG="${DATA_DIR}/netgui.log"
+
+mkdir -p "${DATA_DIR}" 2>/dev/null || true
+printf '%s install_init: %s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${APP_NAME}" "${TRIM_APPVER:-}" >>"${LOG}" 2>/dev/null || true
+
+missing=""
+command -v nmcli >/dev/null 2>&1 || missing="${missing} nmcli"
+command -v ip >/dev/null 2>&1 || missing="${missing} ip"
+
+if [ -n "${missing}" ]; then
+    printf '系统缺少必要命令：%s。本应用依赖 NetworkManager（nmcli）与 iproute2（ip）。\n' "${missing}" \
+        >"${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+    echo "missing commands:${missing}" >>"${LOG}" 2>/dev/null || true
+    exit 1
+fi
+
+exit 0

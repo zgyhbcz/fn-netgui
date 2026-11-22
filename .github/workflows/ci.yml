@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: 单元测试 (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: 语法检查
+        run: |
+          node --check app/server/server.js
+          for f in app/server/lib/*.js; do node --check "$f"; done
+          node --check app/ui/app.js
+
+      - name: 计划与校验单元测试
+        run: node tests/plans.test.js
+
+  gui-check:
+    name: GUI 静态一致性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装校验依赖
+        run: pip install --disable-pip-version-check lxml
+
+      - name: HTML / JS 选择器一致性
+        run: python tools/check_ui.py
+
+  package:
+    name: 打包与产物校验
+    needs: [unit-tests, gui-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 构建 .fpk
+        run: python tools/build_fpk.py
+
+      - name: 校验 .fpk 结构与 checksum
+        run: python tools/verify_fpk.py dist/*.fpk
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: fn-netgui-fpk
+          path: dist/*.fpk
+          if-no-files-found: error
+          retention-days: 14

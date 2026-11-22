@@ -1,0 +1,17 @@
+#!/bin/bash
+# 升级后：状态文件缺失时重建，幂等。
+set -uo pipefail
+
+APP_NAME="${TRIM_APPNAME:-fn-netgui}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/${APP_NAME}/var}"
+STATE="${DATA_DIR}/state.json"
+
+mkdir -p "${DATA_DIR}" 2>/dev/null || true
+if [ ! -f "${STATE}" ]; then
+    printf '{"version":1,"entries":[]}\n' >"${STATE}"
+    chmod 600 "${STATE}" 2>/dev/null || true
+fi
+
+printf '%s upgrade_callback: %s -> %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${TRIM_OLD_APPVER:-}" "${TRIM_APPVER:-}" \
+    >>"${DATA_DIR}/netgui.log" 2>/dev/null || true
+exit 0

@@ -1,0 +1,40 @@
+name: 功能建议
+description: 新的网络场景、界面改进、兼容性需求
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你的网络环境是什么样的？想解决什么问题？
+      placeholder: '例如：双 WAN，一个网口接电信、一个接移动，希望按目的地址分流'
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的行为
+      description: 你希望界面怎么操作、应用生成什么配置
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你目前的替代做法
+      description: 现在是用 SSH 手工执行 nmcli，还是别的工具？
+    validations:
+      required: false
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: 这个改动会动到系统网络吗
+      options:
+        - 只涉及界面 / 提示
+        - 会新增 nmcli 配置
+        - 会改动路由 / 防火墙 / 转发
+        - 不确定
+    validations:
+      required: true
