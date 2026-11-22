@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     把 fn-netgui 发布到 GitHub（创建仓库 + 首次推送）。
