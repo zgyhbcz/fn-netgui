@@ -66,8 +66,11 @@ fn-netgui/
 ├── tests/plans.test.js          # 23 条纯函数测试
 ├── tools/
 │   ├── build_fpk.py             # 免 fnpack 的打包器（校验 + 确定性 tar）
+│   ├── verify_fpk.py            # 校验 .fpk 结构 / 权限位 / checksum（CI 同款）
+│   ├── check_ui.py              # GUI 选择器一致性检查
+│   ├── publish.py               # 用 GitHub API 建仓库并上传（绕开 443 不稳）
 │   └── make_icons.py            # 图标生成（Pillow）
-└── dist/fn-netgui_1.0.0_all.fpk # 构建产物
+└── dist/                        # 构建产物，已被 .gitignore 忽略；发布时挂 Release
 ```
 
 安装后的运行时目录（由 fnOS 创建）：
