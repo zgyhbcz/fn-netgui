@@ -87,6 +87,9 @@ def main(argv: list[str]) -> int:
             bad("manifest service_port 不合法")
         if manifest.get("source") != "thirdparty":
             bad("manifest source 必须是 thirdparty")
+        platform = manifest.get("platform", "x86")
+        if platform not in ("x86", "arm", "loongarch", "risc-v"):
+            bad(f"platform 非法：{platform!r}（appcenter 只接受 x86/arm/loongarch/risc-v，all 会被判约束检查失败）")
         if not errors:
             ok(f"manifest 合法（{appname} {manifest.get('version')} / port {manifest.get('service_port')}）")
 

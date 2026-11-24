@@ -38,6 +38,9 @@ from pathlib import Path
 ROOT_DEFAULT = Path(__file__).resolve().parent.parent
 
 REQUIRED_MANIFEST_KEYS = ["appname", "version", "display_name", "desc", "source", "service_port"]
+# fnpack / appcenter 只接受这四个值；官方文档里的 all 实际会被拒绝
+# （"The value for platform in manifest is invalid. It must be one of x86, arm, loongarch, or risc-v."）
+PLATFORMS = ("x86", "arm", "loongarch", "risc-v")
 CMD_SCRIPTS = [
     "main",
     "install_init",
@@ -108,6 +111,10 @@ def check_project(root: Path) -> dict[str, str]:
     port = manifest.get("service_port", "")
     if not port.isdigit() or not (1024 <= int(port) <= 65535):
         fail(f"service_port 不合法：{port}")
+
+    platform = manifest.get("platform", "x86")
+    if platform not in PLATFORMS:
+        fail(f"platform 必须是 {'/'.join(PLATFORMS)} 之一（不能是 all），当前值：{platform}")
 
     ui_dir = manifest.get("desktop_uidir", "ui")
     if not (root / "app" / ui_dir).is_dir():
@@ -206,7 +213,7 @@ def make_targz(items: list[tuple[Path, str]]) -> bytes:
     return raw.getvalue()
 
 
-def build(root: Path, out_dir: Path, version_override: str | None) -> Path:
+def build(root: Path, out_dir: Path, version_override: str | None, platform_override: str | None = None) -> Path:
     manifest = check_project(root)
     if errors:
         print("项目校验失败：", file=sys.stderr)
@@ -216,7 +223,10 @@ def build(root: Path, out_dir: Path, version_override: str | None) -> Path:
 
     appname = manifest["appname"]
     version = version_override or manifest["version"]
-    platform = manifest.get("platform", "x86")
+    platform = platform_override or manifest.get("platform", "x86")
+    if platform not in PLATFORMS:
+        print(f"platform 必须是 {'/'.join(PLATFORMS)} 之一，收到：{platform}", file=sys.stderr)
+        sys.exit(1)
 
     # 1. app.tgz —— 内容为 app/ 目录下的相对路径（server/…, ui/…）
     app_root = root / "app"
@@ -233,6 +243,8 @@ def build(root: Path, out_dir: Path, version_override: str | None) -> Path:
         manifest_text = manifest_text.rstrip("\n") + f"\nchecksum              = {checksum}\n"
     if version_override:
         manifest_text = re.sub(r"^version\s*=.*$", f"version               = {version}", manifest_text, flags=re.MULTILINE)
+    if platform_override:
+        manifest_text = re.sub(r"^platform\s*=.*$", f"platform              = {platform}", manifest_text, flags=re.MULTILINE)
 
     # 3. 组装 fpk
     staged: list[tuple[Path, str]] = []
@@ -282,8 +294,10 @@ def main() -> None:
     ap.add_argument("--root", default=str(ROOT_DEFAULT), help="项目根目录（含 manifest）")
     ap.add_argument("--out", default=str(ROOT_DEFAULT / "dist"), help="输出目录")
     ap.add_argument("--version", default=None, help="覆盖 manifest 中的版本号")
+    ap.add_argument("--platform", default=None, choices=list(PLATFORMS),
+                    help="覆盖 manifest 中的 platform（x86 / arm）；应用中心会按设备架构做约束检查")
     args = ap.parse_args()
-    build(Path(args.root).resolve(), Path(args.out).resolve(), args.version)
+    build(Path(args.root).resolve(), Path(args.out).resolve(), args.version, args.platform)
 
 
 if __name__ == "__main__":

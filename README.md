@@ -132,22 +132,25 @@ ping 10.0.6.1 && ping 223.5.5.5 && ping baidu.com
 ### 方式 A：仓库自带打包器（无需 fnpack）
 
 ```bash
-python3 tools/build_fpk.py                    # → dist/fn-netgui_1.0.0_all.fpk
-python3 tools/build_fpk.py --version 1.0.1    # 覆盖版本号
+python3 tools/build_fpk.py                     # → dist/fn-netgui_1.0.1_x86.fpk（读 manifest 的 platform）
+python3 tools/build_fpk.py --platform arm      # → dist/fn-netgui_1.0.1_arm.fpk
+python3 tools/build_fpk.py --version 1.0.2     # 覆盖版本号
 ```
 
-它会先做结构校验（manifest 必填字段、图标尺寸、JSON 合法性、cmd 脚本 shebang 与 LF 换行、入口 ID 前缀），再生成确定性 tar（固定 mtime、uid/gid、`cmd/*` 为 0755），并把 `md5(app.tgz)` 写入 manifest 的 `checksum`。
+> **`platform` 只能是 `x86` / `arm` / `loongarch` / `risc-v`**。写成 `all`（官方文档里有这个值）会被 appcenter 判为 **「应用约束检查失败」** 而装不上——`fnpack` 原话是 *must be one of x86, arm, loongarch, or risc-v*。打包器与校验器现在都会拦这个值。
+
+它会先做结构校验（manifest 必填字段、`platform` 取值、图标尺寸、JSON 合法性、cmd 脚本 shebang 与 LF 换行、入口 ID 前缀），再生成确定性 tar（固定 mtime、uid/gid、`cmd/*` 为 0755），并把 `md5(app.tgz)` 写入 manifest 的 `checksum`。
 
 ### 方式 B：官方 fnpack
 
 ```bash
-fnpack build -d fn-netgui      # 产物：fn-netgui-1.0.0.fpk
+fnpack build -d fn-netgui      # 产物：fn-netgui-1.0.1.fpk
 ```
 
 ### 产物结构
 
 ```
-fn-netgui_1.0.0_all.fpk   (tar.gz)
+fn-netgui_1.0.1_x86.fpk   (tar.gz)
 ├── manifest        # checksum = md5(app.tgz)
 ├── app.tgz         # server/ + ui/
 ├── cmd/ config/ wizard/
@@ -159,9 +162,9 @@ fn-netgui_1.0.0_all.fpk   (tar.gz)
 ## 安装与测试
 
 ```bash
-# 应用中心 → 手动安装 → 选择 .fpk
+# 应用中心 → 手动安装 → 选择与本机架构匹配的 .fpk（x86 或 arm）
 # 或命令行：
-appcenter-cli install-fpk fn-netgui_1.0.0_all.fpk
+appcenter-cli install-fpk fn-netgui_1.0.1_x86.fpk
 appcenter-cli list
 appcenter-cli start fn-netgui
 ```
@@ -169,6 +172,7 @@ appcenter-cli start fn-netgui
 - 首次安装会自动拉起依赖 `nodejs_v22`（manifest `install_dep_apps`），无需手工装 Node。
 - 桌面出现「网络配置管家」图标，点击在桌面窗口（iframe）内打开。
 - 卸载时可选择是否连带删除本应用创建的连接。
+- 装错了架构会直接报 **「应用约束检查失败」**：`x86` 包用于 Intel/AMD（N100/N150 等迷你主机），`arm` 包用于 ARM 设备（晶晨/瑞芯微盒子）。
 
 ### 本地开发（无 fnOS 也能跑起来）
 
@@ -195,7 +199,7 @@ python3 tools/check_ui.py          # GUI 静态一致性（HTML id ↔ app.js �
 2. `desktop_uidir = ui` 解析到 `app/ui`：依据 fnpack 模板与 [10router 的实测 fpk](https://github.com/techysy/10router/tree/main/fnos-packaging) 的目录布局。若图标不出现在桌面，把 `app/ui` 复制到包根目录 `ui/` 重新打包即可（两种布局都保留时以根目录为准）。
 3. OVS 端口由 `ovs-vsctl` 直接添加，NetworkManager 可能把它显示为 external；撤销同样走 `ovs-vsctl del-port`。
 4. WiFi 热点需要网卡与驱动支持 AP 模式；5GHz 还受 DFS 信道限制，失败请改用 2.4GHz。
-5. `platform = all`：包内没有架构相关二进制（Node 运行时由 `nodejs_v22` 提供），x86 与 ARM 通用。
+5. **按架构分发**：包内没有架构相关二进制（Node 运行时由 `nodejs_v22` 提供），但 appcenter 的约束检查要求 manifest 的 `platform` 与设备架构一致，所以分别产出 `x86` 与 `arm` 两个包；`all` 会被拒绝（1.0.1 修复）。
 6. NAT 共享依赖 NetworkManager 的 `shared` 模式（自动拉起 dnsmasq）；若系统改过 NM 配置，需自行确认 `ip_forward` 与转发规则。
 
 ---
@@ -214,6 +218,7 @@ ovs-vsctl show                                # 网桥与端口
 
 | 现象 | 处理 |
 | --- | --- |
+| 安装时弹「**应用约束检查失败**」 | manifest 的 `platform` 非法或与设备架构不符（`all` 必定失败）。看清设备架构（系统设置 → 关于 / `uname -m`），装对应包：`x86_64` → `_x86.fpk`，`aarch64` → `_arm.fpk` |
 | 界面提示「非 root · 仅预览」 | `config/privilege` 未被应用，或安装时用了旧包；确认 `run-as: root` 后重启应用 |
 | 预览正常、执行报 `nmcli: command not found` | fnOS 网络未由 NetworkManager 管理（少见），需改用 CLI 手工操作 |
 | 下级设备拿不到 IP | 检查父网段是否冲突、`ip_forward`、上级路由 DHCP 干扰；先试 `10.0.6.1/24` 这类偏僻网段 |

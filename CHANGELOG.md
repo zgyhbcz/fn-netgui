@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-24
+
+### Fixed
+
+- **安装报「应用约束检查失败」**：`manifest` 的 `platform` 原来写 `all`，appcenter 的约束检查只接受 `x86` / `arm` / `loongarch` / `risc-v`（fnpack 报错 *must be one of x86, arm, loongarch, or risc-v*）。现改为按架构分发：`platform = x86`，并额外产出 `_arm` 包。
+- 打包器与校验器现在都会拒绝非法 `platform`，避免同类问题再次流入产物；`build_fpk.py` 新增 `--platform x86|arm` 覆盖参数。
+
 ## [1.0.0] - 2026-11-22
 
 ### Added

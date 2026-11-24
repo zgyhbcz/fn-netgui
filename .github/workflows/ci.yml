@@ -64,8 +64,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 构建 .fpk
-        run: python tools/build_fpk.py
+      - name: 构建 .fpk（x86 + arm）
+        run: |
+          python tools/build_fpk.py --platform x86
+          python tools/build_fpk.py --platform arm
 
       - name: 校验 .fpk 结构与 checksum
         run: python tools/verify_fpk.py dist/*.fpk

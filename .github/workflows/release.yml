@@ -33,8 +33,10 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "发布版本：${VERSION}"
 
-      - name: 构建 .fpk
-        run: python tools/build_fpk.py --version "${{ steps.ver.outputs.version }}"
+      - name: 构建 .fpk（x86 + arm）
+        run: |
+          python tools/build_fpk.py --version "${{ steps.ver.outputs.version }}" --platform x86
+          python tools/build_fpk.py --version "${{ steps.ver.outputs.version }}" --platform arm
 
       - name: 校验产物
         run: python tools/verify_fpk.py dist/*.fpk
