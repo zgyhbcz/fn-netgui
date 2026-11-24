@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """校验构建出的 .fpk 是否可安装：结构、权限位、换行、checksum、内层 app.tgz。
 
-用法：python tools/verify_fpk.py dist/fn-netgui_1.0.0_all.fpk
+支持一次校验多个文件：
+    python tools/verify_fpk.py dist/*.fpk
+
+任一文件失败则退出码为 1。
 """
 
 from __future__ import annotations
@@ -15,7 +18,15 @@ import sys
 import tarfile
 from pathlib import Path
 
-REQUIRED_ENTRIES = ["manifest", "app.tgz", "cmd/main", "cmd/install_init", "config/privilege", "ICON.PNG", "ICON_256.PNG"]
+REQUIRED_ENTRIES = [
+    "manifest",
+    "app.tgz",
+    "cmd/main",
+    "cmd/install_init",
+    "config/privilege",
+    "ICON.PNG",
+    "ICON_256.PNG",
+]
 CMD_SCRIPTS = [
     "cmd/main",
     "cmd/install_init",
@@ -27,6 +38,7 @@ CMD_SCRIPTS = [
     "cmd/uninstall_init",
     "cmd/uninstall_callback",
 ]
+PLATFORMS = ("x86", "arm", "loongarch", "risc-v")
 
 errors: list[str] = []
 checks: list[str] = []
@@ -55,15 +67,10 @@ def parse_manifest(text: str) -> dict[str, str]:
     return out
 
 
-def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print("用法：python tools/verify_fpk.py <file.fpk>", file=sys.stderr)
-        return 2
-
-    path = Path(argv[1])
-    if not path.is_file():
-        print(f"找不到文件：{path}", file=sys.stderr)
-        return 1
+def verify_file(path: Path) -> bool:
+    """校验单个 fpk，返回是否全部通过。"""
+    global errors, checks
+    errors, checks = [], []
 
     with tarfile.open(path, "r:gz") as fpk:
         names = set(fpk.getnames())
@@ -88,10 +95,12 @@ def main(argv: list[str]) -> int:
         if manifest.get("source") != "thirdparty":
             bad("manifest source 必须是 thirdparty")
         platform = manifest.get("platform", "x86")
-        if platform not in ("x86", "arm", "loongarch", "risc-v"):
+        if platform not in PLATFORMS:
             bad(f"platform 非法：{platform!r}（appcenter 只接受 x86/arm/loongarch/risc-v，all 会被判约束检查失败）")
         if not errors:
-            ok(f"manifest 合法（{appname} {manifest.get('version')} / port {manifest.get('service_port')}）")
+            ok(
+                f"manifest 合法（{appname} {manifest.get('version')} / {platform} / port {manifest.get('service_port')}）"
+            )
 
         for script in CMD_SCRIPTS:
             member = members.get(script)
@@ -149,12 +158,35 @@ def main(argv: list[str]) -> int:
     print(f"校验：{path.name}（{path.stat().st_size / 1024:.1f} KiB）")
     for line in checks:
         print(f"  [OK] {line}")
-    if errors:
+    for line in errors:
+        print(f"  [FAIL] {line}")
+    return not errors
+
+
+def main(argv: list[str]) -> int:
+    targets = argv[1:]
+    if not targets:
+        print("用法：python tools/verify_fpk.py <file.fpk> [more.fpk ...]", file=sys.stderr)
+        return 2
+
+    failed: list[str] = []
+    for target in targets:
+        path = Path(target)
+        if not path.is_file():
+            print(f"[FAIL] 找不到文件：{path}", file=sys.stderr)
+            failed.append(str(path))
+            continue
+        if not verify_file(path):
+            failed.append(path.name)
         print()
-        for line in errors:
-            print(f"  [FAIL] {line}")
+
+    if len(targets) > 1:
+        if failed:
+            print(f"共 {len(targets)} 个包，失败 {len(failed)} 个：{', '.join(failed)}")
+        else:
+            print(f"共 {len(targets)} 个包，全部通过")
+    if failed:
         return 1
-    print("\n全部通过")
     return 0
 
 
