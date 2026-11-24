@@ -165,6 +165,20 @@ def set_topics(owner: str, repo: str, token: str) -> None:
         print(f"  [!] topics 设置失败（不影响代码）：{err}")
 
 
+def bootstrap_repo(owner: str, repo: str, branch: str, token: str) -> None:
+    """空仓库不接受 Git Data API 写 blob（409 Git Repository is empty）。
+
+    先用 Contents API 落一个占位文件让仓库非空，后续会用一个无父提交的 root commit
+    覆盖分支指针，占位提交随即变成不可达对象，不会留在历史里。
+    """
+    print("  空仓库：先落占位提交…")
+    request("PUT", f"/repos/{owner}/{repo}/contents/.bootstrap", token, {
+        "message": "chore: bootstrap for initial import",
+        "content": base64.b64encode(b"bootstrap\n").decode("ascii"),
+        "branch": branch,
+    })
+
+
 def upload(owner: str, repo: str, token: str, branch: str, dry_run: bool) -> int:
     files = indexed_files()
     print(f"  索引文件：{len(files)} 个，目标分支：{branch}")
@@ -176,6 +190,12 @@ def upload(owner: str, repo: str, token: str, branch: str, dry_run: bool) -> int
         print("  [dry-run] 不实际写入")
         return 0
 
+    ref = get_optional(f"/repos/{owner}/{repo}/git/ref/heads/{branch}", token)
+    replace_root = ref is None
+    if replace_root:
+        bootstrap_repo(owner, repo, branch, token)
+        ref = get_optional(f"/repos/{owner}/{repo}/git/ref/heads/{branch}", token)
+
     print("  上传 blob…")
     entries = []
     for idx, (mode, path) in enumerate(files, 1):
@@ -186,8 +206,7 @@ def upload(owner: str, repo: str, token: str, branch: str, dry_run: bool) -> int
         if idx % 10 == 0 or idx == len(files):
             print(f"    {idx}/{len(files)}")
 
-    ref = get_optional(f"/repos/{owner}/{repo}/git/ref/heads/{branch}", token)
-    parent_sha = ref["object"]["sha"] if ref else None
+    parent_sha = None if replace_root else (ref["object"]["sha"] if ref else None)
     base_tree = None
     parents: list[str] = []
     if parent_sha:
@@ -216,6 +235,9 @@ def upload(owner: str, repo: str, token: str, branch: str, dry_run: bool) -> int
 
     if parent_sha:
         request("PATCH", f"/repos/{owner}/{repo}/git/refs/heads/{branch}", token, {"sha": commit["sha"], "force": False})
+    elif ref:
+        # 自举场景：用无父提交的 root commit 覆盖分支指针，占位提交变为不可达
+        request("PATCH", f"/repos/{owner}/{repo}/git/refs/heads/{branch}", token, {"sha": commit["sha"], "force": True})
     else:
         request("POST", f"/repos/{owner}/{repo}/git/refs", token, {"ref": f"refs/heads/{branch}", "sha": commit["sha"]})
 
