@@ -217,6 +217,22 @@ def upload(owner: str, repo: str, token: str, branch: str, dry_run: bool) -> int
 
     tree_payload: dict = {"tree": entries}
     if base_tree:
+        # base_tree 会保留旧条目，所以本地已删除的文件必须显式用 sha=null 移除，
+        # 否则远端会残留（例如重命名图标后两张旧图仍在）。
+        remote_tree = request("GET", f"/repos/{owner}/{repo}/git/trees/{base_tree}?recursive=1", token)[1]
+        if remote_tree.get("truncated"):
+            raise RuntimeError("远端 tree 过大被截断，无法安全计算删除列表")
+        local_paths = {entry["path"] for entry in entries}
+        deletions = [
+            {"path": item["path"], "mode": item["mode"], "type": "blob", "sha": None}
+            for item in remote_tree.get("tree", [])
+            if item.get("type") == "blob" and item["path"] not in local_paths
+        ]
+        if deletions:
+            print(f"  删除远端多余文件：{len(deletions)} 个")
+            for item in deletions[:10]:
+                print(f"    - {item['path']}")
+            entries.extend(deletions)
         tree_payload["base_tree"] = base_tree
     _, tree = request("POST", f"/repos/{owner}/{repo}/git/trees", token, tree_payload)
 
