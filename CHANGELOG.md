@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-25
+
+### Fixed
+
+- **桌面图标显示为占位图**：`app/ui/config` 的 `icon` 是 `images/icon_{0}.png`，`{0}` 会被替换成 `64` / `256`，所以文件名必须是 `icon_64.png` / `icon_256.png`；原来打成 `icon-64.png`（短横线）导致取不到图。已重命名并补上 `icon_128.png`，`verify_fpk.py` 增加「icon 占位符能否解析到真实文件」的检查。
+- 顶部 `nmcli` 徽标原来直接回显 `nmcli tool, version 1.42.4`，现在只显示 `nmcli 1.42.4`，完整原文放到 tooltip。
+
+### Added
+
+- `docs/screenshot.png`：实机运行截图（fnOS 1.2.1011 / x86）与 README 界面预览。
+
 ## [1.0.1] - 2026-11-24
 
 ### Fixed

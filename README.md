@@ -10,7 +10,11 @@
 
 > 面向的场景：NAS 只有一个网口接外网，想把另一个网口当 LAN 用；但所在网络「一个 MAC 只能绑定一个 IP」，不能做二层桥接；又不想每次改动都 SSH 进终端敲 `nmcli`。
 
-![icon](ICON_256.PNG)
+## 界面
+
+![网络配置管家在 fnOS 桌面中运行](docs/screenshot.png)
+
+*实机截图：fnOS 1.2.1011 / x86，应用以 root 运行，nmcli 1.42.4 —— 网卡卡片、四种模式、命令预览与执行结果、回滚区、运行日志*
 
 ---
 
@@ -62,8 +66,9 @@ fn-netgui/
 │   └── ui/                      # GUI（原生 JS，无框架）
 │       ├── index.html · app.js · style.css
 │       ├── config               # 桌面 iframe 入口（fn-netgui.main）
-│       └── images/icon-{64,256}.png
+│       └── images/icon_{64,128,256}.png   # 下划线命名，对应 {0} 占位符
 ├── tests/plans.test.js          # 23 条纯函数测试
+├── docs/screenshot.png          # 实机运行截图（README 界面预览）
 ├── tools/
 │   ├── build_fpk.py             # 免 fnpack 的打包器（校验 + 确定性 tar）
 │   ├── verify_fpk.py            # 校验 .fpk 结构 / 权限位 / checksum（CI 同款）

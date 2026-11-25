@@ -1,5 +1,5 @@
 appname               = fn-netgui
-version               = 1.0.1
+version               = 1.0.2
 display_name          = 网络配置管家
 desc                  = 在飞牛桌面里把「第二个网口 / WiFi」共享给下级设备：NAT 共享、OVS 桥接、WiFi 热点，以及静态 IP、网关、DNS、MAC 地址的一站式配置。<br>所有命令先预览再执行，可一键回滚，适合「一个 MAC 只能绑定一个 IP」这类受限网络环境。
 platform              = x86
@@ -15,5 +15,5 @@ service_port          = 38471
 checkport             = true
 ctl_stop              = true
 install_dep_apps      = nodejs_v22
-changelog             = 1.0.1：修复应用中心「应用约束检查失败」——platform 不能为 all，改为按架构分发（x86 / arm 各一个包，本包为 x86）。
+changelog             = 1.0.2：修复桌面图标显示为占位图——ui/config 的 icon 用的是 images/icon_{0}.png，实际文件名必须带下划线（icon_64.png / icon_256.png）；顺带让 nmcli 徽标只显示版本号。
 checksum              = __CHECKSUM__

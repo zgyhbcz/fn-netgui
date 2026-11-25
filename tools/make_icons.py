@@ -86,8 +86,10 @@ def main() -> None:
     targets = [
         (ROOT / "ICON_256.PNG", 256),
         (ROOT / "ICON.PNG", 64),
-        (ROOT / "app" / "ui" / "images" / "icon-256.png", 256),
-        (ROOT / "app" / "ui" / "images" / "icon-64.png", 64),
+        # 桌面入口用 {0} 占位符替换成 64 / 256，所以文件名必须是下划线形式
+        (ROOT / "app" / "ui" / "images" / "icon_256.png", 256),
+        (ROOT / "app" / "ui" / "images" / "icon_128.png", 128),
+        (ROOT / "app" / "ui" / "images" / "icon_64.png", 64),
     ]
     for path, size in targets:
         path.parent.mkdir(parents=True, exist_ok=True)

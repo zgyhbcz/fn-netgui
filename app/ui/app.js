@@ -249,7 +249,10 @@ function renderStatus() {
   }
 
   if (s.tools && s.tools.nmcli) {
-    el.nmBadge.textContent = `nmcli ${(s.tools.nmcliVersion || '').replace('NetworkManager ', '') || '可用'}`;
+    const raw = String(s.tools.nmcliVersion || '').trim();
+    const version = raw.match(/(\d+\.\d+(?:\.\d+)?)/);
+    el.nmBadge.textContent = version ? `nmcli ${version[1]}` : 'nmcli 可用';
+    el.nmBadge.title = raw;
     el.nmBadge.className = 'badge ok';
   } else {
     el.nmBadge.textContent = '未找到 nmcli';

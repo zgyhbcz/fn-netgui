@@ -138,6 +138,7 @@ def verify_file(path: Path) -> bool:
                 if need not in app_names:
                     bad(f"app.tgz 缺少：{need}")
             if "ui/config" in app_names:
+                ui_dir = manifest.get("desktop_uidir", "ui")
                 try:
                     cfg = json.loads(app.extractfile("ui/config").read().decode("utf-8"))
                     entries = cfg.get(".url", {})
@@ -150,6 +151,20 @@ def verify_file(path: Path) -> bool:
                             bad(f"入口 {entry_id} 的 type 非法：{entry.get('type')}")
                         if str(entry.get("port")) != manifest.get("service_port"):
                             bad(f"入口 {entry_id} 端口与 manifest service_port 不一致")
+
+                        # 图标：{0} 会被替换成 64 / 256，必须真的存在对应文件
+                        icon = str(entry.get("icon") or "")
+                        if not icon:
+                            bad(f"入口 {entry_id} 缺少 icon")
+                            continue
+                        wanted = (
+                            [icon.replace("{0}", "64"), icon.replace("{0}", "256")]
+                            if "{0}" in icon
+                            else [icon]
+                        )
+                        for rel in wanted:
+                            if f"{ui_dir}/{rel}" not in app_names:
+                                bad(f"入口 {entry_id} 的图标文件不存在：{ui_dir}/{rel}")
                 except Exception as exc:  # noqa: BLE001
                     bad(f"ui/config 不是合法 JSON：{exc}")
         if not errors:
